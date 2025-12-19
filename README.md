@@ -58,7 +58,7 @@ xgboost         8754       0.118131        0.317687
 
 #### Warm-start parameters for the next FLAML round
 
-```json
+```python
 warm_start_configs = {
     # Top 5 configurations for catboost
     'catboost': [
