@@ -4,7 +4,7 @@ Extract and analyze best configurations from [FLAML AutoML](https://github.com/m
 
 ## Overview
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17987939.svg)](https://doi.org/10.5281/zenodo.17987939)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17987939.svg)](https://doi.org/10.5281/zenodo.17987939) [![Testing](https://github.com/filipsPL/flaml-log-analyze/actions/workflows/test.yml/badge.svg)](https://github.com/filipsPL/flaml-log-analyze/actions/workflows/test.yml)
 
 This tool processes FLAML optimization logs to:
 - Extract best configurations for each learner (algorithm)
