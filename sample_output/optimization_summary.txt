@@ -1,0 +1,136 @@
+================================================================================
+FLAML OPTIMIZATION SUMMARY
+================================================================================
+
+OVERALL STATISTICS
+--------------------------------------------------------------------------------
+Total trials: 12777
+Best validation loss: 0.118131
+Worst validation loss: 0.668284
+Mean validation loss: 0.338847
+Std validation loss: 0.075695
+Total wall clock time: 21599.62 seconds (359.99 minutes)
+Mean trial time: 1.69 seconds
+
+LEARNER STATISTICS
+--------------------------------------------------------------------------------
+Learner         Trials     Best Loss       Mean Loss      
+--------------------------------------------------------------------------------
+catboost        576        0.315344        0.387085       
+extra_tree      909        0.233602        0.425164       
+lgbm            477        0.248275        0.419497       
+rf              1740       0.180855        0.348641       
+xgb_limitdepth  321        0.245129        0.411951       
+xgboost         8754       0.118131        0.317687       
+
+BEST OVERALL CONFIGURATION
+--------------------------------------------------------------------------------
+Learner: xgboost
+Validation Loss: 0.118131
+Train Loss: 0.23708551280415224
+Trial Time: 0.58 seconds
+Configuration:
+  colsample_bylevel: 0.9939130400196377
+  colsample_bytree: 0.6597215177184779
+  learning_rate: 0.4376441656114591
+  max_leaves: 5
+  min_child_weight: 2.688726994141466
+  n_estimators: 4
+  reg_alpha: 0.024477447464082414
+  reg_lambda: 2.885880748906856
+  subsample: 0.7541193336220411
+
+TOP CONFIGURATIONS BY LEARNER
+================================================================================
+
+Learner: CATBOOST
+--------------------------------------------------------------------------------
+
+Rank #1:
+  Validation Loss: 0.315344
+  Train Loss: 0.054967824972228074
+  Trial Time: 3.12 seconds
+  Configuration:
+    early_stopping_rounds: 10
+    learning_rate: 0.14189952377559728
+    n_estimators: 8192
+
+Learner: EXTRA_TREE
+--------------------------------------------------------------------------------
+
+Rank #1:
+  Validation Loss: 0.233602
+  Train Loss: 0.3026307776575403
+  Trial Time: 0.97 seconds
+  Configuration:
+    criterion: entropy
+    max_features: 0.02090605025017727
+    max_leaves: 4
+    n_estimators: 4
+
+Learner: LGBM
+--------------------------------------------------------------------------------
+
+Rank #1:
+  Validation Loss: 0.248275
+  Train Loss: 0.012051993230055347
+  Trial Time: 2.42 seconds
+  Configuration:
+    colsample_bytree: 1.0
+    learning_rate: 0.35196178565785524
+    log_max_bin: 5
+    min_child_samples: 4
+    n_estimators: 17
+    num_leaves: 9
+    reg_alpha: 0.0010897402303114824
+    reg_lambda: 0.3461891281239075
+
+Learner: RF
+--------------------------------------------------------------------------------
+
+Rank #1:
+  Validation Loss: 0.180855
+  Train Loss: 0.09172979134899051
+  Trial Time: 1.57 seconds
+  Configuration:
+    criterion: entropy
+    max_features: 0.02508620447030024
+    max_leaves: 12
+    n_estimators: 18
+
+Learner: XGB_LIMITDEPTH
+--------------------------------------------------------------------------------
+
+Rank #1:
+  Validation Loss: 0.245129
+  Train Loss: 0.014679503605813271
+  Trial Time: 0.71 seconds
+  Configuration:
+    colsample_bylevel: 0.9125165909431615
+    colsample_bytree: 0.9823712175288085
+    learning_rate: 0.05079105270325453
+    max_depth: 7
+    min_child_weight: 0.6117967126789529
+    n_estimators: 4
+    reg_alpha: 0.019308192262154213
+    reg_lambda: 1.1578614055727994
+    subsample: 1.0
+
+Learner: XGBOOST
+--------------------------------------------------------------------------------
+
+Rank #1:
+  Validation Loss: 0.118131
+  Train Loss: 0.23708551280415224
+  Trial Time: 0.58 seconds
+  Configuration:
+    colsample_bylevel: 0.9939130400196377
+    colsample_bytree: 0.6597215177184779
+    learning_rate: 0.4376441656114591
+    max_leaves: 5
+    min_child_weight: 2.688726994141466
+    n_estimators: 4
+    reg_alpha: 0.024477447464082414
+    reg_lambda: 2.885880748906856
+    subsample: 0.7541193336220411
+
