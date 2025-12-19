@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Extract best configurations from FLAML optimization logs.
+flaml-analyze.py :: extract best configurations from FLAML optimization logs.
 
 This script:
 1. Parses FLAML log files (JSON lines format)
@@ -10,12 +10,17 @@ This script:
 5. Saves best configs in a format ready for model training
 6. Saves configurations for warm start (top N overall + top N per method)
 7. Filters out unknown methods from plots and data display
+
+https://github.com/filipsPL/flaml-log-analyze/
+DOI 10.5281/zenodo.17987939
+
+PATCHED VERSION: Fixed type safety issues identified by Pyre
 """
 
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any, DefaultDict, Optional
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -60,14 +65,14 @@ def extract_best_configs(records: List[Dict], n_best: int = 1) -> Dict[str, List
         Dictionary mapping learner name to list of best configs
     """
     # Group records by learner
-    learner_records = defaultdict(list)
+    learner_records: DefaultDict[str, List[Dict]] = defaultdict(list)
     for record in records:
         learner = record.get('learner')
         if learner:
             learner_records[learner].append(record)
     
     # Extract top-n for each learner
-    best_configs = {}
+    best_configs: Dict[str, List[Dict]] = {}
     for learner, recs in learner_records.items():
         # Sort by validation_loss (lower is better)
         sorted_recs = sorted(recs, key=lambda x: x.get('validation_loss', float('inf')))
@@ -76,16 +81,21 @@ def extract_best_configs(records: List[Dict], n_best: int = 1) -> Dict[str, List
     return best_configs
 
 
-def analyze_optimization_progress(records: List[Dict]) -> Dict:
+def analyze_optimization_progress(records: List[Dict]) -> Dict[str, Any]:
     """
     Analyze optimization progress across all trials.
     
     Returns:
         Dictionary with analysis results
     """
-    analysis = {
+    # FIX: Properly type the learners defaultdict with explicit structure
+    learner_stats: DefaultDict[str, Dict[str, Any]] = defaultdict(
+        lambda: {'count': 0, 'best_loss': float('inf')}
+    )
+    
+    analysis: Dict[str, Any] = {
         'total_trials': len(records),
-        'learners': defaultdict(lambda: {'count': 0, 'best_loss': float('inf')}),
+        'learners': learner_stats,
         'cumulative_best': [],
         'wall_clock_times': [],
         'validation_losses': [],
@@ -103,6 +113,10 @@ def analyze_optimization_progress(records: List[Dict]) -> Dict:
         train_loss = record.get('logged_metric', {}).get('train_loss', float('inf'))
         trial_time = record.get('trial_time', 0)
         wall_time = record.get('wall_clock_time', 0)
+        
+        # FIX: Explicitly ensure learner entry exists before updating
+        if learner not in analysis['learners']:
+            analysis['learners'][learner] = {'count': 0, 'best_loss': float('inf')}
         
         # Update learner stats
         analysis['learners'][learner]['count'] += 1
@@ -128,7 +142,7 @@ def analyze_optimization_progress(records: List[Dict]) -> Dict:
     return analysis
 
 
-def plot_optimization_progress(analysis: Dict, output_file: Path):
+def plot_optimization_progress(analysis: Dict[str, Any], output_file: Path):
     """
     Create comprehensive visualization of optimization progress.
     """
@@ -166,8 +180,9 @@ def plot_optimization_progress(analysis: Dict, output_file: Path):
     ax3 = fig.add_subplot(gs[1, 0])
     ax3.scatter(analysis['train_losses'], analysis['validation_losses'], 
                 alpha=0.5, s=30, color='#A23B72')
-    ax3.plot([0, max(analysis['train_losses'])], 
-             [0, max(analysis['train_losses'])], 
+    max_train = max(analysis['train_losses']) if analysis['train_losses'] else 1
+    ax3.plot([0, max_train], 
+             [0, max_train], 
              'k--', alpha=0.3, label='Perfect fit')
     ax3.set_xlabel('Train Loss', fontsize=11)
     ax3.set_ylabel('Validation Loss', fontsize=11)
@@ -187,12 +202,13 @@ def plot_optimization_progress(analysis: Dict, output_file: Path):
     
     # 5. Learner Performance Distribution (Box plot)
     ax5 = fig.add_subplot(gs[2, 0])
-    learner_losses = defaultdict(list)
+    learner_losses: DefaultDict[str, List[float]] = defaultdict(list)
     for learner, loss in zip(analysis['learner_sequence'], analysis['validation_losses']):
         learner_losses[learner].append(loss)
     
+    # Use 'labels' parameter for matplotlib < 3.5 compatibility (tick_labels was added in 3.5)
     bp = ax5.boxplot([learner_losses[l] for l in learners_unique], 
-                      tick_labels=learners_unique,
+                      labels=learners_unique,
                       patch_artist=True)
     for patch, color in zip(bp['boxes'], colors):
         patch.set_facecolor(color)
@@ -237,7 +253,7 @@ def plot_search_space_2d(records: List[Dict], absolute_configs: Dict[str, List[D
     print("\nGenerating search space visualization...")
     
     # Group records by learner
-    learner_records = defaultdict(list)
+    learner_records: DefaultDict[str, List[Dict]] = defaultdict(list)
     for record in records:
         learner = record.get('learner')
         if learner:
@@ -255,9 +271,9 @@ def plot_search_space_2d(records: List[Dict], absolute_configs: Dict[str, List[D
     
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(6*n_cols, 5*n_rows))
     if n_learners == 1:
-        axes = [axes]
+        axes = np.array([axes])
     else:
-        axes = axes.flatten() if n_rows > 1 else axes
+        axes = axes.flatten() if n_rows > 1 else np.array(axes)
     
     for idx, (learner, recs) in enumerate(sorted(learner_records.items())):
         ax = axes[idx]
@@ -290,7 +306,7 @@ def plot_search_space_2d(records: List[Dict], absolute_configs: Dict[str, List[D
                     break
         
         # Create encoders for categorical parameters
-        categorical_encoders = {}
+        categorical_encoders: Dict[str, LabelEncoder] = {}
         for param in categorical_params:
             values = [rec.get('config', {}).get(param) for rec in recs 
                      if rec.get('config', {}).get(param) is not None]
@@ -309,7 +325,7 @@ def plot_search_space_2d(records: List[Dict], absolute_configs: Dict[str, List[D
             validation_losses.append(rec.get('validation_loss', float('inf')))
         
         X = np.array(config_vectors)
-        validation_losses = np.array(validation_losses)
+        validation_losses_array = np.array(validation_losses)
         
         # Handle missing values
         for col_idx in range(X.shape[1]):
@@ -335,7 +351,7 @@ def plot_search_space_2d(records: List[Dict], absolute_configs: Dict[str, List[D
         
         # Plot all trials colored by performance
         scatter = ax.scatter(coords_2d[:, 0], coords_2d[:, 1],
-                           c=validation_losses, cmap='RdYlGn_r',
+                           c=validation_losses_array, cmap='RdYlGn_r',
                            s=50, alpha=0.5, edgecolors='none')
         
         # Get indices of selected configs
@@ -359,7 +375,7 @@ def plot_search_space_2d(records: List[Dict], absolute_configs: Dict[str, List[D
         if absolute_indices:
             ax.scatter(coords_2d[absolute_indices, 0],
                       coords_2d[absolute_indices, 1],
-                      marker='*', s=40, c='red', 
+                      marker='*', s=400, c='red', 
                       edgecolors='black', linewidths=0.5,
                       label='Absolute', zorder=5)
         
@@ -367,7 +383,7 @@ def plot_search_space_2d(records: List[Dict], absolute_configs: Dict[str, List[D
         if representative_indices:
             ax.scatter(coords_2d[representative_indices, 0],
                       coords_2d[representative_indices, 1],
-                      marker='D', s=20, c='blue',
+                      marker='D', s=200, c='blue',
                       edgecolors='black', linewidths=0.5,
                       label='Representative', zorder=5)
         
@@ -375,48 +391,52 @@ def plot_search_space_2d(records: List[Dict], absolute_configs: Dict[str, List[D
         ax.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]:.1%} var)', fontsize=10)
         ax.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]:.1%} var)', fontsize=10)
         ax.set_title(f'{learner} ({len(recs)} trials)', fontsize=11, fontweight='bold')
-        ax.legend(loc='best', fontsize=9)
-        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=9, loc='best')
         
         # Add colorbar
-        cbar = plt.colorbar(scatter, ax=ax)
-        cbar.set_label('Validation Loss', fontsize=9)
+        plt.colorbar(scatter, ax=ax, label='Validation Loss')
     
-    # Hide unused subplots
-    for idx in range(n_learners, len(axes)):
-        axes[idx].axis('off')
+    # Hide empty subplots
+    for idx in range(len(learner_records), len(axes)):
+        axes[idx].set_visible(False)
     
-    plt.suptitle('Search Space Exploration (PCA 2D Projection)', 
-                fontsize=14, fontweight='bold', y=0.995)
-    plt.tight_layout()
+    plt.suptitle('Search Space Exploration (2D PCA Projection)', 
+                 fontsize=14, fontweight='bold', y=0.995)
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
-    print(f"Search space visualization saved to: {output_file}")
+    print(f"Search space plot saved to: {output_file}")
     plt.close()
 
 
-def generate_text_summary(analysis: Dict, best_configs: Dict[str, List[Dict]], 
-                          output_file: Path):
-    """
-    Generate text summary of optimization results.
-    """
+def generate_text_summary(analysis: Dict[str, Any], best_configs: Dict[str, List[Dict]], 
+                         output_file: Path):
+    """Generate detailed text summary of optimization results."""
     with open(output_file, 'w') as f:
         f.write("=" * 80 + "\n")
         f.write("FLAML OPTIMIZATION SUMMARY\n")
         f.write("=" * 80 + "\n\n")
         
-        # Overall Statistics
+        # Overall statistics
         f.write("OVERALL STATISTICS\n")
         f.write("-" * 80 + "\n")
         f.write(f"Total trials: {analysis['total_trials']}\n")
-        f.write(f"Best validation loss: {min(analysis['validation_losses']):.6f}\n")
-        f.write(f"Worst validation loss: {max(analysis['validation_losses']):.6f}\n")
-        f.write(f"Mean validation loss: {np.mean(analysis['validation_losses']):.6f}\n")
-        f.write(f"Std validation loss: {np.std(analysis['validation_losses']):.6f}\n")
-        f.write(f"Total wall clock time: {max(analysis['wall_clock_times']):.2f} seconds "
-                f"({max(analysis['wall_clock_times'])/60:.2f} minutes)\n")
-        f.write(f"Mean trial time: {np.mean(analysis['trial_times']):.2f} seconds\n\n")
         
-        # Learner Statistics
+        if analysis['validation_losses']:
+            f.write(f"Best validation loss: {min(analysis['validation_losses']):.6f}\n")
+            f.write(f"Worst validation loss: {max(analysis['validation_losses']):.6f}\n")
+            f.write(f"Mean validation loss: {np.mean(analysis['validation_losses']):.6f}\n")
+            f.write(f"Std validation loss: {np.std(analysis['validation_losses']):.6f}\n")
+        
+        if analysis['wall_clock_times']:
+            total_time = max(analysis['wall_clock_times'])
+            f.write(f"Total wall clock time: {total_time:.2f} seconds ({total_time/60:.2f} minutes)\n")
+        
+        if analysis['trial_times']:
+            mean_trial_time = np.mean(analysis['trial_times'])
+            f.write(f"Mean trial time: {mean_trial_time:.2f} seconds\n")
+        
+        f.write("\n")
+        
+        # Learner statistics
         f.write("LEARNER STATISTICS\n")
         f.write("-" * 80 + "\n")
         f.write(f"{'Learner':<15} {'Trials':<10} {'Best Loss':<15} {'Mean Loss':<15}\n")
@@ -428,7 +448,7 @@ def generate_text_summary(analysis: Dict, best_configs: Dict[str, List[Dict]],
             learner_losses = [loss for l, loss in zip(analysis['learner_sequence'], 
                                                        analysis['validation_losses']) 
                               if l == learner]
-            mean_loss = np.mean(learner_losses)
+            mean_loss = np.mean(learner_losses) if learner_losses else float('inf')
             f.write(f"{learner:<15} {count:<10} {best_loss:<15.6f} {mean_loss:<15.6f}\n")
         
         f.write("\n")
@@ -440,8 +460,12 @@ def generate_text_summary(analysis: Dict, best_configs: Dict[str, List[Dict]],
             best = analysis['best_overall']
             f.write(f"Learner: {best.get('learner')}\n")
             f.write(f"Validation Loss: {best.get('validation_loss'):.6f}\n")
-            f.write(f"Train Loss: {best.get('logged_metric', {}).get('train_loss', 'N/A')}\n")
-            f.write(f"Trial Time: {best.get('trial_time', 'N/A'):.2f} seconds\n")
+            train_loss = best.get('logged_metric', {}).get('train_loss', 'N/A')
+            if train_loss != 'N/A':
+                f.write(f"Train Loss: {train_loss}\n")
+            trial_time = best.get('trial_time', 'N/A')
+            if trial_time != 'N/A':
+                f.write(f"Trial Time: {trial_time:.2f} seconds\n")
             f.write(f"Configuration:\n")
             config = best.get('config', {})
             for key, value in sorted(config.items()):
@@ -460,8 +484,12 @@ def generate_text_summary(analysis: Dict, best_configs: Dict[str, List[Dict]],
             for idx, record in enumerate(best_configs[learner], 1):
                 f.write(f"\nRank #{idx}:\n")
                 f.write(f"  Validation Loss: {record.get('validation_loss'):.6f}\n")
-                f.write(f"  Train Loss: {record.get('logged_metric', {}).get('train_loss', 'N/A')}\n")
-                f.write(f"  Trial Time: {record.get('trial_time', 'N/A'):.2f} seconds\n")
+                train_loss = record.get('logged_metric', {}).get('train_loss', 'N/A')
+                if train_loss != 'N/A':
+                    f.write(f"  Train Loss: {train_loss}\n")
+                trial_time = record.get('trial_time', 'N/A')
+                if trial_time != 'N/A':
+                    f.write(f"  Trial Time: {trial_time:.2f} seconds\n")
                 f.write(f"  Configuration:\n")
                 config = record.get('config', {})
                 for key, value in sorted(config.items()):
@@ -474,7 +502,7 @@ def generate_text_summary(analysis: Dict, best_configs: Dict[str, List[Dict]],
 
 
 def encode_config_to_vector(config: Dict, param_names: List[str], 
-                            categorical_encoders: Dict) -> np.ndarray:
+                            categorical_encoders: Dict[str, LabelEncoder]) -> np.ndarray:
     """
     Encode a configuration dictionary to a numerical vector.
     
@@ -562,7 +590,7 @@ def select_diverse_configs(records: List[Dict], n_select: int,
                 break
     
     # Create label encoders for categorical parameters
-    categorical_encoders = {}
+    categorical_encoders: Dict[str, LabelEncoder] = {}
     for param in categorical_params:
         values = [rec.get('config', {}).get(param) for rec in filtered_recs 
                  if rec.get('config', {}).get(param) is not None]
@@ -634,7 +662,7 @@ def select_diverse_configs(records: List[Dict], n_select: int,
 
 
 def save_warm_start_configs(records: List[Dict], n_overall: int, n_per_method: int, 
-                            output_file: Path, performance_percentile: float = 20.0) -> Tuple[Dict, Dict]:
+                            output_file: Path, performance_percentile: float = 20.0) -> Tuple[Dict[str, List[Dict]], Dict[str, List[Dict]]]:
     """
     Save configurations for warm start in Python dictionary format.
     Generates two files:
@@ -644,50 +672,29 @@ def save_warm_start_configs(records: List[Dict], n_overall: int, n_per_method: i
        - K-Means clustering (identify diverse regions)
        - Best performer selection (pick best from each cluster)
     
-    Saves:
-    - Top n_overall best configurations (across all methods)
-    - Top n_per_method best configurations for each method
-    
-    Args:
-        records: List of all FLAML log records
-        n_overall: Number of best overall configs to save
-        n_per_method: Number of best configs per method to save
-        output_file: Path to save warm start configs (will create two variants)
-        performance_percentile: Top X% to keep before clustering (default: 20%)
-    
-    Returns:
-        Tuple of (absolute_dict, representative_dict) containing the selected configs
-    
-    Format: Python dictionary that can be directly imported
-    warm_start_configs = {
-        'learner_name': [
-            {config_dict},  # Rank N: metric=X.XXXXXX
-            ...
-        ],
-        ...
-    }
+    Saves two dictionaries: absolute_dict, representative_dict
     """
-    # Get records for each learner
-    learner_records = defaultdict(list)
+    # Group by learner
+    learner_records: DefaultDict[str, List[Dict]] = defaultdict(list)
     for record in records:
         learner = record.get('learner')
         if learner:
             learner_records[learner].append(record)
     
-    # Build two versions: absolute and representative
-    absolute_dict = {}
-    representative_dict = {}
+    # FIX: Properly initialize dictionaries with correct types
+    absolute_dict: Dict[str, List[Dict[str, Any]]] = {}
+    representative_dict: Dict[str, List[Dict[str, Any]]] = {}
     
-    for learner in sorted(learner_records.keys()):
-        print(f"\nProcessing {learner}:")
-        
-        # ABSOLUTE: Simple top N by performance
+    for learner in learner_records:
+        # Sort by validation_loss
         sorted_recs = sorted(learner_records[learner], 
                            key=lambda x: x.get('validation_loss', float('inf')))
-        absolute_configs = sorted_recs[:n_per_method]
+        
+        # ABSOLUTE: Simple top N
+        top_n = sorted_recs[:n_per_method]
         
         absolute_list = []
-        for idx, record in enumerate(absolute_configs, 1):
+        for idx, record in enumerate(top_n, 1):
             config = record.get('config', {})
             val_loss = record.get('validation_loss')
             absolute_list.append({
@@ -696,7 +703,6 @@ def save_warm_start_configs(records: List[Dict], n_overall: int, n_per_method: i
                 'metric': val_loss
             })
         absolute_dict[learner] = absolute_list
-        print(f"  Absolute: Selected top {len(absolute_list)} configs by performance")
         
         # REPRESENTATIVE: Hybrid selection (filtering + k-medoids)
         representative_configs = select_diverse_configs(
@@ -744,7 +750,7 @@ def save_warm_start_configs(records: List[Dict], n_overall: int, n_per_method: i
     return absolute_dict, representative_dict
 
 
-def _write_warm_start_file(warm_start_dict: Dict, output_file: Path, description: str):
+def _write_warm_start_file(warm_start_dict: Dict[str, List[Dict[str, Any]]], output_file: Path, description: str):
     """
     Helper function to write warm start configurations to a Python file.
     
@@ -870,8 +876,8 @@ Examples:
     plot_optimization_progress(analysis, plot_file)
     
     # Save warm start configs (now always generated by default)
-    absolute_dict = {}
-    representative_dict = {}
+    absolute_dict: Dict[str, List[Dict[str, Any]]] = {}
+    representative_dict: Dict[str, List[Dict[str, Any]]] = {}
     if args.warm_start_overall > 0 or args.warm_start_per_method > 0:
         print("\nGenerating warm start configurations...")
         absolute_dict, representative_dict = save_warm_start_configs(
@@ -885,9 +891,12 @@ Examples:
     print("QUICK SUMMARY")
     print("=" * 80)
     print(f"Total trials: {analysis['total_trials']}")
-    print(f"Best validation loss: {min(analysis['validation_losses']):.6f}")
-    print(f"Best learner: {analysis['best_overall'].get('learner') if analysis['best_overall'] else 'N/A'}")
-    print(f"Total time: {max(analysis['wall_clock_times'])/60:.2f} minutes")
+    if analysis['validation_losses']:
+        print(f"Best validation loss: {min(analysis['validation_losses']):.6f}")
+    if analysis['best_overall']:
+        print(f"Best learner: {analysis['best_overall'].get('learner')}")
+    if analysis['wall_clock_times']:
+        print(f"Total time: {max(analysis['wall_clock_times'])/60:.2f} minutes")
     print("\nLearner trial counts:")
     for learner in sorted(analysis['learners'].keys()):
         count = analysis['learners'][learner]['count']
