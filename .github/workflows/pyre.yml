@@ -16,3 +16,4 @@ jobs:
         uses: facebook/pyre-action@v0.0.2
         with:
             repo-directory: './'
+            requirements-path: 'requirements.txt'
