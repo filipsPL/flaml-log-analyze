@@ -288,6 +288,6 @@ Focus on best-known region
 
 ## Version History
 
-- **v0.1.1**: K-Means + best per cluster approach
+- **v0.1.2**: K-Means + best per cluster approach
 - **v0.1.0**: Added PCA 2D visualization
 - **v0.0.1**: Initial release with absolute/representative selection
