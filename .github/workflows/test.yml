@@ -67,8 +67,8 @@ jobs:
     
     - name: Run flaml-analyze script
       run: |
-        chmod +x flaml-analyze_patched.py
-        python flaml-analyze_patched.py test_optimization.log -n 3 --warm-start-per-method 5
+        chmod +x flaml-analyze.py
+        python flaml-analyze.py test_optimization.log -n 3 --warm-start-per-method 5
     
     - name: Verify output files exist
       run: |
