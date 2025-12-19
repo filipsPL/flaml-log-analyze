@@ -92,7 +92,7 @@ The script generates:
    - Pure top-N configurations ranked by performance
    - Use for maximum performance and fast convergence
 
-2. **`warm_start_configs_representative.py`** ⭐ Recommended
+2. **`warm_start_configs_representative.py`**
    - Diverse configurations (K-Means + best per cluster)
    - Use for exploration and robustness
 
@@ -246,13 +246,6 @@ Focus on best-known region
     --warm-start-per-method 1
 ```
 
-## Performance
-
-- **Parsing**: Fast (~1s for 1000 trials)
-- **Clustering**: Fast (~0.1s for 100 configs, K=5)
-- **Visualization**: Fast (~1s per learner)
-- **Total runtime**: Typically <10s for most log files
-
 ## Algorithm Details
 
 ### Representative Selection
@@ -260,6 +253,10 @@ Focus on best-known region
 2. **K-Means clustering**: Group into K clusters
 3. **Best per cluster**: Select champion from each cluster
 4. **Result**: K diverse, high-performing configurations
+
+### Known issues
+
+- Encoding of Categorical Variables before PCA and clustering using LabelEncoder. The Issue: LabelEncoder assigns arbitrary integers (0, 1, 2). K-Means treats these as continuous distances. The PCA projections and clusters for categorical hyperparameters may be slightly distorted.
 
 
 ## Version History
