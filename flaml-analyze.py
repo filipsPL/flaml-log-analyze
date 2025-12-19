@@ -15,7 +15,7 @@ https://github.com/filipsPL/flaml-log-analyze/
 DOI 10.5281/zenodo.17987939
 
 PATCHED VERSION: Fixed type safety issues identified by Pyre
-Signed version
+Signed version with the new key BBD34CB5A8A770C1AC065299D4E57E96FCAF10F3
 """
 
 import json
