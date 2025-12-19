@@ -4,6 +4,8 @@ Extract and analyze best configurations from [FLAML AutoML](https://github.com/m
 
 ## Overview
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17987939.svg)](https://doi.org/10.5281/zenodo.17987939)
+
 This tool processes FLAML optimization logs to:
 - Extract best configurations for each learner (algorithm)
 - Generate two types of warm start configurations:
@@ -12,9 +14,19 @@ This tool processes FLAML optimization logs to:
 - Visualize the search space exploration
 - Provide detailed optimization statistics
 
+## Sample outputs
+
+
+#### Optimization summary
+
 ![sample analysis](sample_output/optimization_analysis.png)
 
+#### Search space visualization
+
 ![sample exploration](sample_output/search_space_2d.png)
+
+
+#### Performance report
 
 ```
 ================================================================================
@@ -42,6 +54,21 @@ rf              1740       0.180855        0.348641
 xgb_limitdepth  321        0.245129        0.411951
 xgboost         8754       0.118131        0.317687
 ...
+```
+
+#### Warm-start parameters for the next FLAML round
+
+```json
+warm_start_configs = {
+    # Top 5 configurations for catboost
+    'catboost': [
+        {"early_stopping_rounds":10,"learning_rate":0.14189952377559728,"n_estimators":8192,"FLAML_sample_size":49659},  # Rank 1: metric=0.315344
+        {"early_stopping_rounds":11,"learning_rate":0.1530902242854414,"n_estimators":8192,"FLAML_sample_size":10000},  # Rank 2: metric=0.316097
+        {"early_stopping_rounds":12,"learning_rate":0.09541333025917802,"n_estimators":8192,"FLAML_sample_size":49659},  # Rank 3: metric=0.320287
+        {"early_stopping_rounds":10,"learning_rate":0.09544104526717777,"n_estimators":8192,"FLAML_sample_size":49659},  # Rank 4: metric=0.320287
+        {"early_stopping_rounds":10,"learning_rate":0.09541180730499482,"n_estimators":8192,"FLAML_sample_size":49659},  # Rank 5: metric=0.320287
+    ]
+}
 ```
 
 ## Requirements
