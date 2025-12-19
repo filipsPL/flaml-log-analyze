@@ -1,0 +1,230 @@
+name: Test flaml-analyze
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test on Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8', '3.12']
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Display Python version
+      run: |
+        python --version
+        pip --version
+    
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Verify dependencies
+      run: |
+        pip list
+        python -c "import numpy; print(f'numpy: {numpy.__version__}')"
+        python -c "import sklearn; print(f'scikit-learn: {sklearn.__version__}')"
+        python -c "import matplotlib; print(f'matplotlib: {matplotlib.__version__}')"
+    
+    - name: Prepare test data
+      run: |
+        # Unzip the sample log file
+        gunzip -c sample_input/optimization.log.gz > test_optimization.log
+        
+        # Verify the log file was created and has content
+        if [ ! -f test_optimization.log ]; then
+          echo "Error: Failed to extract log file"
+          exit 1
+        fi
+        
+        file_size=$(wc -c < test_optimization.log)
+        if [ "$file_size" -eq 0 ]; then
+          echo "Error: Log file is empty"
+          exit 1
+        fi
+        
+        echo "Log file size: $file_size bytes"
+        echo "First 5 lines of log file:"
+        head -n 5 test_optimization.log
+    
+    - name: Run flaml-analyze script
+      run: |
+        chmod +x flaml-analyze_patched.py
+        python flaml-analyze_patched.py test_optimization.log -n 3 --warm-start-per-method 5
+    
+    - name: Verify output files exist
+      run: |
+        echo "Checking for required output files..."
+        
+        # List all files in current directory
+        echo "Files in current directory:"
+        ls -lh
+        
+        # Check each required file
+        files=(
+          "optimization_analysis.png"
+          "optimization_summary.txt"
+          "search_space_2d.png"
+          "warm_start_configs_absolute.py"
+          "warm_start_configs_representative.py"
+        )
+        
+        missing_files=0
+        for file in "${files[@]}"; do
+          if [ ! -f "$file" ]; then
+            echo "❌ MISSING: $file"
+            missing_files=$((missing_files + 1))
+          else
+            echo "✓ Found: $file"
+          fi
+        done
+        
+        if [ $missing_files -gt 0 ]; then
+          echo ""
+          echo "Error: $missing_files required output file(s) missing"
+          exit 1
+        fi
+        
+        echo ""
+        echo "All required files found!"
+    
+    - name: Verify output files are non-empty
+      run: |
+        echo "Verifying output file sizes..."
+        
+        files=(
+          "optimization_analysis.png"
+          "optimization_summary.txt"
+          "search_space_2d.png"
+          "warm_start_configs_absolute.py"
+          "warm_start_configs_representative.py"
+        )
+        
+        empty_files=0
+        for file in "${files[@]}"; do
+          size=$(wc -c < "$file")
+          if [ "$size" -eq 0 ]; then
+            echo "❌ EMPTY: $file (0 bytes)"
+            empty_files=$((empty_files + 1))
+          else
+            echo "✓ $file: $size bytes"
+          fi
+        done
+        
+        if [ $empty_files -gt 0 ]; then
+          echo ""
+          echo "Error: $empty_files output file(s) are empty"
+          exit 1
+        fi
+        
+        echo ""
+        echo "All output files have non-zero size!"
+    
+    - name: Validate output content
+      run: |
+        echo "Validating output file content..."
+        
+        # Check that PNG files are valid PNG images
+        echo "Checking PNG files..."
+        for png_file in optimization_analysis.png search_space_2d.png; do
+          if file "$png_file" | grep -q "PNG image data"; then
+            echo "✓ $png_file is a valid PNG image"
+          else
+            echo "❌ $png_file is not a valid PNG image"
+            file "$png_file"
+            exit 1
+          fi
+        done
+        
+        # Check that Python config files are valid Python syntax
+        echo "Checking Python config files..."
+        for py_file in warm_start_configs_absolute.py warm_start_configs_representative.py; do
+          if python -m py_compile "$py_file"; then
+            echo "✓ $py_file has valid Python syntax"
+          else
+            echo "❌ $py_file has invalid Python syntax"
+            exit 1
+          fi
+        done
+        
+        # Check that config files contain expected structure
+        echo "Checking config file structure..."
+        for py_file in warm_start_configs_absolute.py warm_start_configs_representative.py; do
+          if grep -q "warm_start_configs = {" "$py_file"; then
+            echo "✓ $py_file contains warm_start_configs dictionary"
+          else
+            echo "❌ $py_file missing warm_start_configs dictionary"
+            exit 1
+          fi
+        done
+        
+        # Check summary file contains expected sections
+        echo "Checking summary file content..."
+        required_sections=(
+          "FLAML OPTIMIZATION SUMMARY"
+          "OVERALL STATISTICS"
+          "LEARNER STATISTICS"
+          "BEST OVERALL CONFIGURATION"
+        )
+        
+        for section in "${required_sections[@]}"; do
+          if grep -q "$section" optimization_summary.txt; then
+            echo "✓ Found section: $section"
+          else
+            echo "❌ Missing section: $section"
+            exit 1
+          fi
+        done
+        
+        echo ""
+        echo "All output files are valid!"
+    
+    - name: Display summary statistics
+      run: |
+        echo "=== Test Summary ==="
+        echo "Python version: $(python --version)"
+        echo ""
+        echo "Output file sizes:"
+        ls -lh optimization_analysis.png optimization_summary.txt search_space_2d.png \
+           warm_start_configs_absolute.py warm_start_configs_representative.py
+        echo ""
+        echo "Summary file preview (first 30 lines):"
+        head -n 30 optimization_summary.txt
+    
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-outputs-python-${{ matrix.python-version }}
+        path: |
+          optimization_analysis.png
+          optimization_summary.txt
+          search_space_2d.png
+          warm_start_configs_absolute.py
+          warm_start_configs_representative.py
+          test_optimization.log
+        retention-days: 7
+    
+    - name: Test completed successfully
+      run: |
+        echo "=========================================="
+        echo "✅ All tests passed for Python ${{ matrix.python-version }}"
+        echo "=========================================="
